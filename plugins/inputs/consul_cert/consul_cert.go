@@ -97,7 +97,10 @@ func (c *Consul) createAPIClient() (*api.Client, error) {
 func (c *Consul) GatherCertCheck(acc telegraf.Accumulator, certs []*api.KVPair) {
 	for _, cert := range certs {
 		if m := expiryMatcher.FindStringSubmatch(cert.Key); len(m) == 2 {
-			expires, _ := time.Parse(time.RFC3339, string(cert.Value))
+			expires, err := time.Parse(time.RFC3339, string(cert.Value))
+			if err != nil {
+				continue
+			}
 			d := expires.Sub(time.Now())
 
 			record := make(map[string]interface{})
