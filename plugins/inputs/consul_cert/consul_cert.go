@@ -51,7 +51,7 @@ var sampleConfig = `
 var expiryMatcher = regexp.MustCompile("/(.*)/expires$")
 
 func (c *Consul) Description() string {
-	return "Gather health check statuses from services registered in Consul"
+	return "Gather certificate validity time for consul-cert-postman domains"
 }
 
 func (c *Consul) SampleConfig() string {
