@@ -17,6 +17,7 @@ import (
 	_ "github.com/influxdata/telegraf/plugins/outputs/librato"
 	_ "github.com/influxdata/telegraf/plugins/outputs/mqtt"
 	_ "github.com/influxdata/telegraf/plugins/outputs/nats"
+	_ "github.com/influxdata/telegraf/plugins/outputs/nsca"
 	_ "github.com/influxdata/telegraf/plugins/outputs/nsq"
 	_ "github.com/influxdata/telegraf/plugins/outputs/opentsdb"
 	_ "github.com/influxdata/telegraf/plugins/outputs/prometheus_client"
