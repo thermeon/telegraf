@@ -1,9 +1,15 @@
 // Package nsca is a Go client for the Nagios Service Check Acceptor (NSCA).
+
 package nsca
 
 import (
+	"fmt"
 	"net"
 	"time"
+
+	"github.com/influxdata/telegraf"
+	"github.com/influxdata/telegraf/plugins/outputs"
+	"github.com/influxdata/telegraf/plugins/serializers"
 )
 
 // ServerInfo contains the configuration information for an NSCA server
@@ -34,6 +40,27 @@ type Message struct {
 	Status chan<- error
 }
 
+var sampleConfig = `
+  subject = "telegraf"
+  ## Data format to output.
+  ## Each data format has its own unique set of configuration options, read
+  ## more about them here:
+  ## https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_OUTPUT.md
+  data_format = "influx"
+`
+
+func (n *NSCAServer) SetSerializer(serializer serializers.Serializer) {
+	n.serializer = serializer
+}
+
+func (n *NSCAServer) SampleConfig() string {
+	return sampleConfig
+}
+
+func (n *NSCAServer) Description() string {
+	return "Send telegraf measurements to nsca"
+}
+
 // RunEndpoint creates a long-lived connection to an NSCA server. Messages sent into the messages
 // channel are sent to the NSCA server. Close the quit channel to end the routine. RunEndpoint
 // does it's own initialization, cleanup and error recovery and can safely be used from multiple threads.
@@ -47,7 +74,7 @@ func RunEndpoint(connectInfo ServerInfo, quit <-chan interface{}, messages <-cha
 			return
 		case m := <-messages:
 			if server.conn == nil {
-				err = server.Connect(connectInfo)
+				err = server.Connect()
 			}
 			if err == nil {
 				err = server.Send(m)
@@ -69,17 +96,19 @@ type NSCAServer struct {
 	conn            net.Conn
 	encryption      *encryption
 	serverTimestamp uint32
-	timeout         time.Duration
+	serializer      serializers.Serializer
+	serverInfo      ServerInfo
 }
 
 // Connect to an NSCA server.
-func (n *NSCAServer) Connect(connectInfo ServerInfo) error {
+func (n *NSCAServer) Connect() error {
 	var conn net.Conn
 	var err error
-	if connectInfo.Timeout > 0 {
-		conn, err = net.DialTimeout("tcp", net.JoinHostPort(connectInfo.Host, connectInfo.Port), connectInfo.Timeout)
+	if n.serverInfo.Timeout > 0 {
+		conn, err = net.DialTimeout("tcp", net.JoinHostPort(n.serverInfo.Host, n.serverInfo.Port), n.serverInfo.Timeout)
+		fmt.Println("time-out", err)
 	} else {
-		conn, err = net.Dial("tcp", net.JoinHostPort(connectInfo.Host, connectInfo.Port))
+		conn, err = net.Dial("tcp", net.JoinHostPort(n.serverInfo.Host, n.serverInfo.Port))
 	}
 	if err != nil {
 		return err
@@ -90,30 +119,54 @@ func (n *NSCAServer) Connect(connectInfo ServerInfo) error {
 		return err
 	}
 	n.Close()
-	n.encryption = newEncryption(connectInfo.EncryptionMethod, ip.iv, connectInfo.Password)
+	n.encryption = newEncryption(n.serverInfo.EncryptionMethod, ip.iv, n.serverInfo.Password)
 	n.serverTimestamp = ip.timestamp
-	n.timeout = connectInfo.Timeout
 	n.conn = conn
 	return nil
 }
 
 // Close the connection and clean up.
-func (n *NSCAServer) Close() {
+func (n *NSCAServer) Close() error {
 	if n.conn != nil {
 		n.conn.Close()
 		n.conn = nil
 	}
 	n.serverTimestamp = 0
 	n.encryption = nil
-	n.timeout = 0
+	n.serverInfo.Timeout = 0
+	return nil
 }
 
 // Send an NSCA message.
 func (n *NSCAServer) Send(message *Message) error {
 	msg := newDataPacket(n.serverTimestamp, message.State, message.Host, message.Service, message.Message)
-	if n.timeout > 0 {
-		n.conn.SetDeadline(time.Now().Add(n.timeout))
+	if n.serverInfo.Timeout > 0 {
+		n.conn.SetDeadline(time.Now().Add(n.serverInfo.Timeout))
 	}
 	err := msg.write(n.conn, n.encryption)
 	return err
+}
+
+func (n *NSCAServer) Write(metrics []telegraf.Metric) error {
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	for _, metric := range metrics {
+		buf, err := n.serializer.Serialize(metric)
+		if err != nil {
+			return err
+		}
+
+		_, err = n.conn.Write(buf)
+		if err != nil {
+			return fmt.Errorf("FAILED to write message: %s", err)
+		}
+	}
+	return nil
+}
+func init() {
+	outputs.Add("nsca", func() telegraf.Output {
+		return &NSCAServer{}
+	})
 }

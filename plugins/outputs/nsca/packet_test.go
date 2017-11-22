@@ -135,7 +135,7 @@ func TestSession(t *testing.T) {
 func TestServer(t *testing.T) {
 	// TODO: disable the Skip if you have a real NSCA server to test against
 	t.Skip("Skipping test that uses a real NSCA server")
-	conn, err := net.Dial("tcp", ":5667")
+	conn, err := net.Dial("tcp", ":5666")
 	if err != nil {
 		t.Fatalf("Could not connect to server: %s", err)
 	}
