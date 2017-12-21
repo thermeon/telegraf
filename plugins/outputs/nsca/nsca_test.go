@@ -48,12 +48,12 @@ type message struct {
 }
 
 var sampleConfig = `
-  Url = "icinga.dev.thermeon.com:5668"
+  subject = "telegraf"
   ## Data format to output.
   ## Each data format has its own unique set of configuration options, read
   ## more about them here:
   ## https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_OUTPUT.md
-  ##data_format = "influx"
+  data_format = "influx"
 `
 
 func (n *NSCAServer) SetSerializer(serializer serializers.Serializer) {
@@ -71,7 +71,6 @@ func (n *NSCAServer) Description() string {
 // NSCAServer can be used as a lower-level alternative to RunEndpoint. It is NOT safe
 // to use an instance across mutiple threads.
 type NSCAServer struct {
-	Url        string
 	conn       net.Conn
 	serializer serializers.Serializer
 	serverInfo ServerInfo
@@ -79,9 +78,9 @@ type NSCAServer struct {
 
 // Connect to an NSCA server.
 func (n *NSCAServer) Connect() error {
-	conn, err := tls.Dial("tcp", n.Url, config)
+	conn, err := tls.Dial("tcp", "icinga.dev.thermeon.com:5668", config)
 	if err != nil {
-		return err
+		fmt.Println(err)
 	}
 	n.Close()
 	n.conn = conn
