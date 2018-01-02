@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/influxdata/telegraf"
-
 	"github.com/influxdata/telegraf/plugins/serializers/graphite"
 	"github.com/influxdata/telegraf/plugins/serializers/influx"
 	"github.com/influxdata/telegraf/plugins/serializers/json"
+	"github.com/influxdata/telegraf/plugins/serializers/nsca"
 )
 
 // SerializerOutput is an interface for output plugins that are able to
@@ -55,6 +55,8 @@ func NewSerializer(config *Config) (Serializer, error) {
 		serializer, err = NewGraphiteSerializer(config.Prefix, config.Template)
 	case "json":
 		serializer, err = NewJsonSerializer(config.TimestampUnits)
+	case "nsca":
+		serializer, err = NewNscaSerializer()
 	default:
 		err = fmt.Errorf("Invalid data format: %s", config.DataFormat)
 	}
@@ -74,4 +76,8 @@ func NewGraphiteSerializer(prefix, template string) (Serializer, error) {
 		Prefix:   prefix,
 		Template: template,
 	}, nil
+}
+
+func NewNscaSerializer() (Serializer, error) {
+	return &nsca.NscaSerializer{}, nil
 }
