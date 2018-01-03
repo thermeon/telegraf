@@ -1,7 +1,6 @@
 package nsca
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -14,6 +13,12 @@ const (
 
 	// CPU load is in warning state
 	STATE_WARNING = 8
+
+	// Disk State is in warning if used disk equal/greated than 80%
+	DISK_WARNING = 80
+
+	// Disk State is in critical if used disk equal/greated than 90%
+	DISK_CRITICAL = 90
 )
 
 type NscaSerializer struct {
@@ -23,49 +28,89 @@ func (s *NscaSerializer) Serialize(metric telegraf.Metric) ([]byte, error) {
 	metricsName := metric.Name()
 	var byteResp []byte
 	switch metricsName {
-	case "cpu":
+	case "system":
 		byteResp = getCPULoad(metric)
+	case "mem":
+		byteResp = getDiskStatus(metric)
 	}
+
 	return byteResp, nil
 }
 
 func getCPULoad(metric telegraf.Metric) []byte {
-	tags := metric.Tags()
+
 	var message []byte
-	if tags[metric.Name()] == "cpu-total" {
+	tags := metric.Tags()
+	field := metric.Fields()
 
-		field := metric.Fields()
+	//performing metric only when it contains "load1" or we can take any of the below map
+	//map[n_users: n_cpus: load1: load5: load15:]
+	if _, ok := field["load1"]; ok {
 
-		user := field["usage_user"]
-		system := field["usage_system"]
-		guest := field["usage_guest"]
-		host := field["host"]
+		load1 := field["load1"]
+		load5 := field["load5"]
+		load15 := field["load15"]
+		host := tags["host"]
+		cpuTotal := load1.(float64)
 
-		cpuTotal := user.(float64) + system.(float64) + guest.(float64)
-
-		var cpuStatus string
+		var cpuStatus, status string
 		if cpuTotal <= float64(STATE_OK) {
-			//status=OK
+			//status -> OK
 			cpuStatus = "0"
+			status = "OK"
 		} else if cpuTotal > float64(STATE_OK) && cpuTotal < float64(STATE_WARNING) {
-			//status=WARNING
+			//status -> WARNING
 			cpuStatus = "1"
+			status = "WARNING"
 		} else {
-			//status=CRITICAL
+			//status -> CRITICAL
 			cpuStatus = "2"
+			status = "CRITICAL"
 		}
 		service := "CPU Load"
-		loadMsg := "load average: " + strconv.FormatFloat(cpuTotal, 'f', 6, 64)
-		fmt.Println("message", loadMsg)
-		message = buildMessage(cpuStatus, service, loadMsg, host.(string))
-
+		load1Str := strconv.FormatFloat(load1.(float64), 'f', 6, 64)
+		load5Str := strconv.FormatFloat(load5.(float64), 'f', 6, 64)
+		load15Str := strconv.FormatFloat(load15.(float64), 'f', 6, 64)
+		loadMsg := status + " - load average: " + load1Str + "," + load5Str + "," + load15Str
+		message = buildMessage(cpuStatus, service, loadMsg, host)
 	}
+
+	return message
+}
+func getDiskStatus(metric telegraf.Metric) []byte {
+	var message []byte
+	tags := metric.Tags()
+	field := metric.Fields()
+
+	usedPercent := field["used_percent"]
+	host := tags["host"]
+
+	diskState := usedPercent.(float64)
+
+	var diskStatus, status string
+	if diskState < float64(DISK_WARNING) {
+		//status -> OK
+		diskStatus = "0"
+		status = "OK"
+	} else if diskState >= float64(DISK_WARNING) && diskState < float64(DISK_CRITICAL) {
+		//status -> WARNING
+		diskStatus = "1"
+		status = "WARNING"
+	} else {
+		//status -> CRITICAL
+		diskStatus = "2"
+		status = "CRITICAL"
+	}
+	service := "Disk Space"
+	loadMsg := "Disk State: " + status
+	message = buildMessage(diskStatus, service, loadMsg, host)
+
 	return message
 }
 func buildMessage(status, service, loadMsg, hostname string) []byte {
 
 	tim := time.Now().Unix()
-	//hostname = "passive.dev.thermeon.com;"
+	//hostname = "passive.dev.thermeon.com"
 	loadMessage := "[" + strconv.Itoa(int(tim)) + "]" + " PROCESS_SERVICE_CHECK_RESULT;" +
 		hostname + ";" + service + ";" + status + ";" + loadMsg + ";\n"
 	return []byte(loadMessage)

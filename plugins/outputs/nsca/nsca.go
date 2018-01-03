@@ -137,19 +137,18 @@ func (n *NSCAServer) Write(metrics []telegraf.Metric) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("len of metrics", len(metrics))
 	for _, metric := range metrics {
 		buf, err := s.Serialize(metric)
 		if err != nil {
-			fmt.Printf("E! Error serializing some metrics to graphite: %s", err.Error())
+			fmt.Printf("E! Error serializing some metrics to nsca: %s", err.Error())
 		}
 		batch = append(batch, buf...)
 	}
 	text := "PUSH " + strconv.Itoa(len(batch))
 	fmt.Fprintf(n.conn, text+"\n")
 
-	if _, e := n.conn.Write(batch); e != nil {
-		fmt.Println("E! NSCA Error: " + e.Error())
+	if _, err = n.conn.Write(batch); err != nil {
+		fmt.Println("E! NSCA Error: " + err.Error())
 	}
 	return err
 }
