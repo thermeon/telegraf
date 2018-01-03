@@ -8,11 +8,14 @@ import (
 )
 
 const (
-	// CPU load is in ok state
-	STATE_OK = 6
 
 	// CPU load is in warning state
-	STATE_WARNING = 8
+	// if cpu core is 4 then warning thresold is 3.6(90%)
+	STATE_WARNING = 3.6
+
+	// CPU load is in critical state
+	// if cpu core is 4 then critical thresold is 4(100%)
+	STATE_CRITICAL = 4
 
 	// Disk State is in warning if used disk equal/greated than 80%
 	DISK_WARNING = 80
@@ -43,7 +46,7 @@ func getCPULoad(metric telegraf.Metric) []byte {
 	tags := metric.Tags()
 	field := metric.Fields()
 
-	//performing metric only when it contains "load1" or we can take any of the below map
+	//performing metric only when it contains "load1" or we can check any of the below map
 	//map[n_users: n_cpus: load1: load5: load15:]
 	if _, ok := field["load1"]; ok {
 
@@ -54,11 +57,11 @@ func getCPULoad(metric telegraf.Metric) []byte {
 		cpuTotal := load1.(float64)
 
 		var cpuStatus, status string
-		if cpuTotal <= float64(STATE_OK) {
+		if cpuTotal < float64(STATE_WARNING) {
 			//status -> OK
 			cpuStatus = "0"
 			status = "OK"
-		} else if cpuTotal > float64(STATE_OK) && cpuTotal < float64(STATE_WARNING) {
+		} else if cpuTotal >= float64(STATE_WARNING) && cpuTotal < float64(STATE_CRITICAL) {
 			//status -> WARNING
 			cpuStatus = "1"
 			status = "WARNING"
@@ -67,6 +70,7 @@ func getCPULoad(metric telegraf.Metric) []byte {
 			cpuStatus = "2"
 			status = "CRITICAL"
 		}
+
 		service := "CPU Load"
 		load1Str := strconv.FormatFloat(load1.(float64), 'f', 6, 64)
 		load5Str := strconv.FormatFloat(load5.(float64), 'f', 6, 64)
@@ -102,7 +106,7 @@ func getDiskStatus(metric telegraf.Metric) []byte {
 		status = "CRITICAL"
 	}
 	service := "Disk Space"
-	loadMsg := "Disk State: " + status
+	loadMsg := "Disk : " + status
 	message = buildMessage(diskStatus, service, loadMsg, host)
 
 	return message
