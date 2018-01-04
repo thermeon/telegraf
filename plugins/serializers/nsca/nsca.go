@@ -7,24 +7,11 @@ import (
 	"github.com/influxdata/telegraf"
 )
 
-const (
-
-	// CPU load is in warning state
-	// if cpu core is 4 then warning thresold is 3.6(90%)
-	STATE_WARNING = 3.6
-
-	// CPU load is in critical state
-	// if cpu core is 4 then critical thresold is 4(100%)
-	STATE_CRITICAL = 4
-
-	// Disk State is in warning if used disk equal/greated than 80%
-	DISK_WARNING = 80
-
-	// Disk State is in critical if used disk equal/greated than 90%
-	DISK_CRITICAL = 90
-)
-
 type NscaSerializer struct {
+	CPUWarning   float64
+	CPUCritical  float64
+	DiskWarning  float64
+	DiskCritical float64
 }
 
 func (s *NscaSerializer) Serialize(metric telegraf.Metric) ([]byte, error) {
@@ -32,15 +19,15 @@ func (s *NscaSerializer) Serialize(metric telegraf.Metric) ([]byte, error) {
 	var byteResp []byte
 	switch metricsName {
 	case "system":
-		byteResp = getCPULoad(metric)
+		byteResp = s.getCPULoad(metric)
 	case "mem":
-		byteResp = getDiskStatus(metric)
+		byteResp = s.getDiskStatus(metric)
 	}
 
 	return byteResp, nil
 }
 
-func getCPULoad(metric telegraf.Metric) []byte {
+func (s *NscaSerializer) getCPULoad(metric telegraf.Metric) []byte {
 
 	var message []byte
 	tags := metric.Tags()
@@ -55,13 +42,12 @@ func getCPULoad(metric telegraf.Metric) []byte {
 		load15 := field["load15"]
 		host := tags["host"]
 		cpuTotal := load1.(float64)
-
 		var cpuStatus, status string
-		if cpuTotal < float64(STATE_WARNING) {
+		if cpuTotal < s.CPUWarning {
 			//status -> OK
 			cpuStatus = "0"
 			status = "OK"
-		} else if cpuTotal >= float64(STATE_WARNING) && cpuTotal < float64(STATE_CRITICAL) {
+		} else if cpuTotal >= s.CPUWarning && cpuTotal < s.CPUCritical {
 			//status -> WARNING
 			cpuStatus = "1"
 			status = "WARNING"
@@ -81,7 +67,7 @@ func getCPULoad(metric telegraf.Metric) []byte {
 
 	return message
 }
-func getDiskStatus(metric telegraf.Metric) []byte {
+func (s *NscaSerializer) getDiskStatus(metric telegraf.Metric) []byte {
 	var message []byte
 	tags := metric.Tags()
 	field := metric.Fields()
@@ -92,11 +78,11 @@ func getDiskStatus(metric telegraf.Metric) []byte {
 	diskState := usedPercent.(float64)
 
 	var diskStatus, status string
-	if diskState < float64(DISK_WARNING) {
+	if diskState < s.DiskWarning {
 		//status -> OK
 		diskStatus = "0"
 		status = "OK"
-	} else if diskState >= float64(DISK_WARNING) && diskState < float64(DISK_CRITICAL) {
+	} else if diskState >= s.DiskWarning && diskState < s.DiskCritical {
 		//status -> WARNING
 		diskStatus = "1"
 		status = "WARNING"

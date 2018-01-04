@@ -45,10 +45,14 @@ type message struct {
 // NSCAServer can be used as a lower-level alternative to RunEndpoint. It is NOT safe
 // to use an instance across mutiple threads.
 type NSCAServer struct {
-	Url        string
-	conn       net.Conn
-	serializer serializers.Serializer
-	serverInfo ServerInfo
+	Url          string
+	conn         net.Conn
+	serializer   serializers.Serializer
+	serverInfo   ServerInfo
+	CPUWarning   float64
+	CPUCritical  float64
+	DiskWarning  float64
+	DiskCritical float64
 }
 
 var sampleConfig = `
@@ -58,6 +62,10 @@ var sampleConfig = `
   ## more about them here:
   ## https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_OUTPUT.md
   ##data_format = "influx"
+  CPUWarning = 3.6
+  CPUCritical = 4.0
+  DiskWarning = 80.0
+  DiskCritical = 90.0
 `
 
 func (n *NSCAServer) SetSerializer(serializer serializers.Serializer) {
@@ -110,7 +118,6 @@ func (n *NSCAServer) Connect() error {
 	if err != nil {
 		return err
 	}
-	n.Close()
 	n.conn = conn
 	return nil
 }
@@ -133,14 +140,14 @@ func (n *NSCAServer) Write(metrics []telegraf.Metric) error {
 	fmt.Fprintf(n.conn, command+"\n")
 
 	var batch []byte
-	s, err := serializers.NewNscaSerializer()
+	s, err := serializers.NewNscaSerializer(n.CPUWarning, n.CPUCritical, n.DiskWarning, n.DiskCritical)
 	if err != nil {
 		return err
 	}
 	for _, metric := range metrics {
 		buf, err := s.Serialize(metric)
 		if err != nil {
-			fmt.Printf("E! Error serializing some metrics to nsca: %s", err.Error())
+			fmt.Printf("Error serializing some metrics to nsca: %s", err.Error())
 		}
 		batch = append(batch, buf...)
 	}
@@ -148,7 +155,7 @@ func (n *NSCAServer) Write(metrics []telegraf.Metric) error {
 	fmt.Fprintf(n.conn, text+"\n")
 
 	if _, err = n.conn.Write(batch); err != nil {
-		fmt.Println("E! NSCA Error: " + err.Error())
+		fmt.Println("NSCA Error: " + err.Error())
 	}
 	return err
 }

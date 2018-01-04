@@ -23,7 +23,10 @@ func TestSerializeCPULoad(t *testing.T) {
 	m, err := metric.New("system", tags, fields, now)
 	assert.NoError(t, err)
 
-	s := NscaSerializer{}
+	s := NscaSerializer{
+		CPUWarning:  float64(3.6),
+		CPUCritical: float64(4.0),
+	}
 	buf, _ := s.Serialize(m)
 	mS := strings.Split(strings.TrimSpace(string(buf)), "\n")
 	split := strings.Split(mS[0], ";")
@@ -45,13 +48,16 @@ func TestSerializeDiskState(t *testing.T) {
 	m, err := metric.New("mem", tags, fields, now)
 	assert.NoError(t, err)
 
-	s := NscaSerializer{}
+	s := NscaSerializer{
+		DiskWarning:  float64(80),
+		DiskCritical: float64(90),
+	}
 	buf, _ := s.Serialize(m)
 	mS := strings.Split(strings.TrimSpace(string(buf)), "\n")
 	split := strings.Split(mS[0], ";")
 	assert.Equal(t, "passive.dev.thermeon.com", split[1])
 	assert.Equal(t, "Disk Space", split[2])
 	assert.Equal(t, "0", split[3])
-	assert.Equal(t, "Disk State: OK", split[4])
+	assert.Equal(t, "Disk : OK", split[4])
 	assert.NoError(t, err)
 }
