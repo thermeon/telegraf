@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"time"
 
+	"fmt"
+
 	"github.com/influxdata/telegraf"
 )
 
@@ -61,7 +63,7 @@ func (s *NscaSerializer) getCPULoad(metric telegraf.Metric) []byte {
 		load1Str := strconv.FormatFloat(load1.(float64), 'f', 6, 64)
 		load5Str := strconv.FormatFloat(load5.(float64), 'f', 6, 64)
 		load15Str := strconv.FormatFloat(load15.(float64), 'f', 6, 64)
-		loadMsg := status + " - load average: " + load1Str + "," + load5Str + "," + load15Str
+		loadMsg := fmt.Sprintf("%s - load average: %s,%s,%s", status, load1Str, load5Str, load15Str)
 		message = buildMessage(cpuStatus, service, loadMsg, host)
 	}
 
@@ -98,10 +100,8 @@ func (s *NscaSerializer) getDiskStatus(metric telegraf.Metric) []byte {
 	return message
 }
 func buildMessage(status, service, loadMsg, hostname string) []byte {
-
 	tim := time.Now().Unix()
-	//hostname = "passive.dev.thermeon.com"
-	loadMessage := "[" + strconv.Itoa(int(tim)) + "]" + " PROCESS_SERVICE_CHECK_RESULT;" +
-		hostname + ";" + service + ";" + status + ";" + loadMsg + ";\n"
+	hostname = "passive.dev.thermeon.com"
+	loadMessage := fmt.Sprintf("[%s] PROCESS_SERVICE_CHECK_RESULT;%s;%s;%s;%s;\n", strconv.Itoa(int(tim)), hostname, service, status, loadMsg)
 	return []byte(loadMessage)
 }

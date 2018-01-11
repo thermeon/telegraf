@@ -8,7 +8,7 @@ import (
 	"github.com/influxdata/telegraf/plugins/serializers/graphite"
 	"github.com/influxdata/telegraf/plugins/serializers/influx"
 	"github.com/influxdata/telegraf/plugins/serializers/json"
-	"github.com/thermeon/telegraf/plugins/serializers/nsca"
+	"github.com/influxdata/telegraf/plugins/serializers/nsca"
 )
 
 // SerializerOutput is an interface for output plugins that are able to
